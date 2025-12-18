@@ -1,157 +1,80 @@
-using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Mvc;
+using NetChapterAspire.Server.Models.Common;
 using NetChapterAspire.Server.Models.DTOs;
+using NetChapterAspire.Server.Services.Interfaces;
 
 namespace NetChapterAspire.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServiceBusController(ServiceBusClient serviceBusClient, ILogger<ServiceBusController> logger) : ControllerBase
+public class ServiceBusController(IServiceBusService serviceBusService) : ControllerBase
 {
-    private const string QueueName = "demo-queue";
-
     [HttpPost("send")]
     public async Task<IActionResult> SendMessage([FromBody] SendMessageRequest request)
     {
         if (string.IsNullOrEmpty(request.Message))
         {
-            return BadRequest(new { success = false, message = "Message cannot be empty" });
+            return BadRequest(ApiResponse.ErrorResponse("Message cannot be empty"));
         }
 
-        try
-        {
-            // Create a sender for the queue
-            ServiceBusSender? sender = serviceBusClient.CreateSender(QueueName);
+        await serviceBusService.SendMessageAsync(request.Message, request.Subject);
 
-            // Create a message
-            ServiceBusMessage message = new(request.Message)
+        return Ok(ApiResponse<object>.SuccessResponse(
+            new
             {
-                Subject = request.Subject ?? "Demo Message",
-                MessageId = Guid.NewGuid().ToString(),
-                ContentType = "text/plain"
-            };
-
-            // Add custom properties
-            message.ApplicationProperties.Add("SentAt", DateTime.UtcNow);
-            message.ApplicationProperties.Add("Source", "NetChapter Aspire");
-
-            // Send the message
-            await sender.SendMessageAsync(message);
-
-            logger.LogInformation("Message sent to queue {QueueName}: {MessageId}", QueueName, message.MessageId);
-
-            return Ok(new
-            {
-                success = true,
-                message = "Message sent successfully!",
-                details = new
-                {
-                    messageId = message.MessageId,
-                    queueName = QueueName,
-                    subject = message.Subject,
-                    sentAt = DateTime.UtcNow
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error sending message to Service Bus");
-            return StatusCode(500, new
-            {
-                success = false,
-                message = $"Error sending message: {ex.Message}"
-            });
-        }
+                queueName = "demo-queue",
+                subject = request.Subject ?? "Demo Message"
+            },
+            "Message sent successfully!"
+        ));
     }
 
     [HttpGet("receive")]
     public async Task<IActionResult> ReceiveMessages([FromQuery] int maxMessages = 10)
     {
-        try
+        var receivedMessages = await serviceBusService.ReceiveMessagesAsync(
+            maxMessages, 
+            TimeSpan.FromSeconds(5)
+        );
+
+        var messages = receivedMessages.Select(message => new
         {
-            // Create a receiver for the queue
-            ServiceBusReceiver? receiver = serviceBusClient.CreateReceiver(QueueName);
+            messageId = message.MessageId,
+            subject = message.Subject,
+            body = message.Body.ToString(),
+            enqueuedTime = message.EnqueuedTime,
+            deliveryCount = message.DeliveryCount,
+            properties = message.ApplicationProperties
+        }).ToList();
 
-            List<object> messages = [];
-            IReadOnlyList<ServiceBusReceivedMessage>? receivedMessages = await receiver.ReceiveMessagesAsync(maxMessages, TimeSpan.FromSeconds(5));
-
-            foreach (ServiceBusReceivedMessage message in receivedMessages)
-            {
-                messages.Add(new
-                {
-                    messageId = message.MessageId,
-                    subject = message.Subject,
-                    body = message.Body.ToString(),
-                    enqueuedTime = message.EnqueuedTime,
-                    deliveryCount = message.DeliveryCount,
-                    properties = message.ApplicationProperties
-                });
-
-                // Complete the message (remove from queue)
-                await receiver.CompleteMessageAsync(message);
-            }
-
-            logger.LogInformation("Received {Count} messages from queue {QueueName}", messages.Count, QueueName);
-
-            return Ok(new
-            {
-                success = true,
-                count = messages.Count,
-                messages = messages
-            });
-        }
-        catch (Exception ex)
+        // Complete all received messages
+        foreach (var message in receivedMessages)
         {
-            logger.LogError(ex, "Error receiving messages from Service Bus");
-            return StatusCode(500, new
-            {
-                success = false,
-                message = $"Error receiving messages: {ex.Message}"
-            });
+            await serviceBusService.CompleteMessageAsync(message);
         }
+
+        return Ok(ApiResponse<object>.SuccessResponse(
+            new { count = messages.Count, messages }
+        ));
     }
 
     [HttpGet("peek")]
     public async Task<IActionResult> PeekMessages([FromQuery] int maxMessages = 10)
     {
-        try
+        var peekedMessages = await serviceBusService.PeekMessagesAsync(maxMessages);
+
+        var messages = peekedMessages.Select(message => new
         {
-            // Create a receiver for the queue
-            ServiceBusReceiver? receiver = serviceBusClient.CreateReceiver(QueueName);
+            messageId = message.MessageId,
+            subject = message.Subject,
+            body = message.Body.ToString(),
+            enqueuedTime = message.EnqueuedTime,
+            deliveryCount = message.DeliveryCount,
+            properties = message.ApplicationProperties
+        }).ToList();
 
-            List<object> messages = [];
-            IReadOnlyList<ServiceBusReceivedMessage>? peekedMessages = await receiver.PeekMessagesAsync(maxMessages);
-
-            foreach (ServiceBusReceivedMessage message in peekedMessages)
-            {
-                messages.Add(new
-                {
-                    messageId = message.MessageId,
-                    subject = message.Subject,
-                    body = message.Body.ToString(),
-                    enqueuedTime = message.EnqueuedTime,
-                    deliveryCount = message.DeliveryCount,
-                    properties = message.ApplicationProperties
-                });
-            }
-
-            logger.LogInformation("Peeked {Count} messages from queue {QueueName}", messages.Count, QueueName);
-
-            return Ok(new
-            {
-                success = true,
-                count = messages.Count,
-                messages = messages
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error peeking messages from Service Bus");
-            return StatusCode(500, new
-            {
-                success = false,
-                message = $"Error peeking messages: {ex.Message}"
-            });
-        }
+        return Ok(ApiResponse<object>.SuccessResponse(
+            new { count = messages.Count, messages }
+        ));
     }
 }

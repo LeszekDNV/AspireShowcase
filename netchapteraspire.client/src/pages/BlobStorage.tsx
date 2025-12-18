@@ -1,15 +1,9 @@
 import './Page.css'
 import { useState, useEffect } from 'react'
-
-interface BlobItem {
-  name: string
-  size: number
-  lastModified: string
-  contentType: string
-}
+import type { ApiResponse, BlobFileInfo, BlobUploadData } from '../types/api'
 
 function BlobStorage() {
-  const [blobs, setBlobs] = useState<BlobItem[]>([])
+  const [blobs, setBlobs] = useState<BlobFileInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -20,11 +14,12 @@ function BlobStorage() {
     setMessage('')
     try {
       const response = await fetch('/api/BlobStorage/list')
-      if (response.ok) {
-        const data = await response.json()
-        setBlobs(data)
+      const data: ApiResponse<BlobFileInfo[]> = await response.json()
+      
+      if (data.success && data.data) {
+        setBlobs(data.data)
       } else {
-        setMessage('Error loading blob list')
+        setMessage(data.message || 'Error loading blob list')
       }
     } catch (error) {
       setMessage('Error connecting to server')
@@ -58,9 +53,10 @@ function BlobStorage() {
         body: formData,
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        setMessage(`File "${result.fileName}" uploaded successfully!`)
+      const result: ApiResponse<BlobUploadData> = await response.json()
+
+      if (result.success && result.data) {
+        setMessage(`${result.message}\nFile: ${result.data.fileName}`)
         setSelectedFile(null)
         // Reset file input
         const fileInput = document.getElementById('fileInput') as HTMLInputElement
@@ -68,7 +64,7 @@ function BlobStorage() {
         // Refresh blob list
         fetchBlobs()
       } else {
-        setMessage('Error uploading file')
+        setMessage(result.message || 'Error uploading file')
       }
     } catch (error) {
       setMessage('Error connecting to server')

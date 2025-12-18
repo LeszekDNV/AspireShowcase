@@ -3,6 +3,10 @@
     <Project Path="Aspire/NetChapterAspire.AppHost/NetChapterAspire.AppHost.csproj" Id="a1d4d77e-a8e3-4ae4-8d32-d81ded0ac332" />
     <Project Path="Aspire/NetChapterAspire.ServiceDefaults/NetChapterAspire.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="doc/ARCHITECTURE_GUIDE.md" />
+    <File Path="README.md" />
+  </Folder>
   <Project Path="netchapteraspire.client/netchapteraspire.client.esproj">
     <Build />
     <Deploy Solution="Release|*" />

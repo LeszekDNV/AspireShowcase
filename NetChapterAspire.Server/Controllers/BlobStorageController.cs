@@ -1,71 +1,33 @@
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Mvc;
+using NetChapterAspire.Server.Models.Common;
+using NetChapterAspire.Server.Services.Interfaces;
 
 namespace NetChapterAspire.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BlobStorageController(BlobServiceClient blobServiceClient) : ControllerBase
+public class BlobStorageController(IBlobStorageService blobStorageService) : ControllerBase
 {
-    private const string ContainerName = "test-container-1";
-
     [HttpPost("upload")]
     public async Task<IActionResult> UploadFile(IFormFile? file)
     {
         if (file is not { Length: not 0 })
         {
-            return BadRequest("No file provided");
+            return BadRequest(ApiResponse.ErrorResponse("No file provided"));
         }
 
-        try
-        {
-            BlobContainerClient? containerClient = blobServiceClient.GetBlobContainerClient(ContainerName);
-            await containerClient.CreateIfNotExistsAsync();
+        await using var stream = file.OpenReadStream();
+        var fileName = await blobStorageService.UploadFileAsync(stream, file.FileName);
 
-            BlobClient? blobClient = containerClient.GetBlobClient(file.FileName);
-
-            await using Stream stream = file.OpenReadStream();
-            await blobClient.UploadAsync(stream, overwrite: true);
-
-            return Ok(new { fileName = file.FileName, message = "File uploaded successfully" });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, $"Error uploading file: {ex.Message}");
-        }
+        return Ok(ApiResponse<object>.SuccessResponse(
+            new { fileName, message = "File uploaded successfully" }
+        ));
     }
 
     [HttpGet("list")]
     public async Task<IActionResult> ListFiles()
     {
-        try
-        {
-            BlobContainerClient? containerClient = blobServiceClient.GetBlobContainerClient(ContainerName);
-
-            if (!await containerClient.ExistsAsync())
-            {
-                return Ok(new List<object>());
-            }
-
-            List<object> blobs = [];
-
-            await foreach (BlobItem blobItem in containerClient.GetBlobsAsync())
-            {
-                blobs.Add(new
-                {
-                    name = blobItem.Name,
-                    size = blobItem.Properties.ContentLength,
-                    lastModified = blobItem.Properties.LastModified,
-                    contentType = blobItem.Properties.ContentType
-                });
-            }
-
-            return Ok(blobs);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, $"Error listing files: {ex.Message}");
-        }
+        var files = await blobStorageService.ListFilesAsync();
+        return Ok(ApiResponse<object>.SuccessResponse(files));
     }
 }

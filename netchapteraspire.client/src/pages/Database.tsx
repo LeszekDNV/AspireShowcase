@@ -1,20 +1,6 @@
 ﻿import './Page.css'
 import { useState, useEffect } from 'react'
-
-interface Book {
-  id: number
-  title: string
-  author: string
-  isbn: string
-  pageCount: number
-  createdAt: string
-}
-
-interface ApiResponse {
-  success: boolean
-  message: string
-  book?: Book
-}
+import type { ApiResponse, Book } from '../types/api'
 
 function Database() {
   const [activeTab, setActiveTab] = useState<'add' | 'list'>('add')
@@ -35,12 +21,13 @@ function Database() {
 
     try {
       const response = await fetch('/api/Database/books')
-      if (response.ok) {
-        const data: Book[] = await response.json()
-        setBooks(data)
+      const data: ApiResponse<Book[]> = await response.json()
+      
+      if (data.success && data.data) {
+        setBooks(data.data)
       } else {
         setMessageType('error')
-        setMessage('Error loading books')
+        setMessage(data.message || 'Error loading books')
       }
     } catch (error) {
       setMessageType('error')
@@ -70,11 +57,11 @@ function Database() {
         }),
       })
 
-      const data: ApiResponse = await response.json()
+      const data: ApiResponse<Book> = await response.json()
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setMessageType('success')
-        setMessage(data.message)
+        setMessage(data.message || 'Book added successfully!')
         // Clear form
         setTitle('')
         setAuthor('')
@@ -110,11 +97,11 @@ function Database() {
         method: 'DELETE',
       })
 
-      const data: ApiResponse = await response.json()
+      const data: ApiResponse<void> = await response.json()
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setMessageType('success')
-        setMessage(data.message)
+        setMessage(data.message || 'Book deleted successfully!')
         fetchBooks()
       } else {
         setMessageType('error')

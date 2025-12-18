@@ -1,21 +1,10 @@
 ﻿import './Page.css'
 import { useState } from 'react'
+import type { ApiResponse, Message, MessagesData } from '../types/api'
 
-interface Message {
-  messageId: string
+interface SendMessageData {
+  queueName: string
   subject: string
-  body: string
-  enqueuedTime: string
-  deliveryCount: number
-  properties: Record<string, any>
-}
-
-interface ApiResponse {
-  success: boolean
-  message?: string
-  count?: number
-  messages?: Message[]
-  details?: any
 }
 
 function ServiceBus() {
@@ -48,11 +37,11 @@ function ServiceBus() {
         }),
       })
 
-      const data: ApiResponse = await response.json()
+      const data: ApiResponse<SendMessageData> = await response.json()
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setMessageType('success')
-        setMessage(`${data.message}\nMessage ID: ${data.details?.messageId}\nQueue: ${data.details?.queueName}`)
+        setMessage(`${data.message}\nQueue: ${data.data?.queueName}\nSubject: ${data.data?.subject}`)
         setMessageBody('')
       } else {
         setMessageType('error')
@@ -73,12 +62,12 @@ function ServiceBus() {
 
     try {
       const response = await fetch('/api/ServiceBus/receive?maxMessages=10')
-      const data: ApiResponse = await response.json()
+      const data: ApiResponse<MessagesData> = await response.json()
 
-      if (response.ok && data.success) {
-        setReceivedMessages(data.messages || [])
+      if (data.success && data.data) {
+        setReceivedMessages(data.data.messages || [])
         setMessageType('success')
-        setMessage(`Received ${data.count} message(s)`)
+        setMessage(`Received ${data.data.count} message(s)`)
       } else {
         setMessageType('error')
         setMessage(data.message || 'Failed to receive messages')
@@ -98,12 +87,12 @@ function ServiceBus() {
 
     try {
       const response = await fetch('/api/ServiceBus/peek?maxMessages=10')
-      const data: ApiResponse = await response.json()
+      const data: ApiResponse<MessagesData> = await response.json()
 
-      if (response.ok && data.success) {
-        setReceivedMessages(data.messages || [])
+      if (data.success && data.data) {
+        setReceivedMessages(data.data.messages || [])
         setMessageType('success')
-        setMessage(`Peeked ${data.count} message(s) (messages not removed from queue)`)
+        setMessage(`Peeked ${data.data.count} message(s) (messages not removed from queue)`)
       } else {
         setMessageType('error')
         setMessage(data.message || 'Failed to peek messages')

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetChapterAspire.Server.Data;
 using NetChapterAspire.Server.Models;
+using NetChapterAspire.Server.Models.Common;
 using NetChapterAspire.Server.Models.DTOs;
 
 namespace NetChapterAspire.Server.Controllers;
@@ -13,19 +14,11 @@ public class DatabaseController(ApplicationDbContext context, ILogger<DatabaseCo
     [HttpGet("books")]
     public async Task<IActionResult> GetBooks()
     {
-        try
-        {
-            List<Book> books = await context.Books
-                .OrderByDescending(b => b.CreatedAt)
-                .ToListAsync();
+        var books = await context.Books
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
 
-            return Ok(books);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error retrieving books");
-            return StatusCode(500, new { message = $"Error retrieving books: {ex.Message}" });
-        }
+        return Ok(ApiResponse<IEnumerable<Book>>.SuccessResponse(books));
     }
 
     [HttpPost("books")]
@@ -33,73 +26,40 @@ public class DatabaseController(ApplicationDbContext context, ILogger<DatabaseCo
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(ApiResponse.ErrorResponse("Invalid model state"));
         }
 
-        try
+        var book = new Book
         {
-            Book book = new()
-            {
-                Title = request.Title,
-                Author = request.Author,
-                ISBN = request.ISBN,
-                PageCount = request.PageCount,
-                CreatedAt = DateTime.UtcNow
-            };
+            Title = request.Title,
+            Author = request.Author,
+            ISBN = request.ISBN,
+            PageCount = request.PageCount,
+            CreatedAt = DateTime.UtcNow
+        };
 
-            context.Books.Add(book);
-            await context.SaveChangesAsync();
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
 
-            logger.LogInformation("Book added successfully: {Title} by {Author}", book.Title, book.Author);
+        logger.LogInformation("Book added successfully: {Title} by {Author}", book.Title, book.Author);
 
-            return Ok(new
-            {
-                success = true,
-                message = "Book added successfully!",
-                book = book
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error adding book");
-            return StatusCode(500, new
-            {
-                success = false,
-                message = $"Error adding book: {ex.Message}"
-            });
-        }
+        return Ok(ApiResponse<Book>.SuccessResponse(book, "Book added successfully!"));
     }
 
     [HttpDelete("books/{id}")]
     public async Task<IActionResult> DeleteBook(int id)
     {
-        try
+        var book = await context.Books.FindAsync(id);
+        if (book == null)
         {
-            Book? book = await context.Books.FindAsync(id);
-            if (book == null)
-            {
-                return NotFound(new { message = "Book not found" });
-            }
-
-            context.Books.Remove(book);
-            await context.SaveChangesAsync();
-
-            logger.LogInformation("Book deleted successfully: {Title}", book.Title);
-
-            return Ok(new
-            {
-                success = true,
-                message = "Book deleted successfully!"
-            });
+            return NotFound(ApiResponse.ErrorResponse("Book not found"));
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error deleting book");
-            return StatusCode(500, new
-            {
-                success = false,
-                message = $"Error deleting book: {ex.Message}"
-            });
-        }
+
+        context.Books.Remove(book);
+        await context.SaveChangesAsync();
+
+        logger.LogInformation("Book deleted successfully: {Title}", book.Title);
+
+        return Ok(ApiResponse.SuccessResponse("Book deleted successfully!"));
     }
 }

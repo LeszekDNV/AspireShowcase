@@ -1,16 +1,6 @@
 ﻿import './Page.css'
 import { useState } from 'react'
-
-interface SendMailResponse {
-  success: boolean
-  message: string
-  details?: {
-    to: string
-    subject: string
-    smtpHost: string
-    smtpPort: number
-  }
-}
+import type { ApiResponse, EmailData } from '../types/api'
 
 function Mailing() {
   const [loading, setLoading] = useState(false)
@@ -37,11 +27,11 @@ function Mailing() {
         }),
       })
 
-      const data: SendMailResponse = await response.json()
+      const data: ApiResponse<EmailData> = await response.json()
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setMessageType('success')
-        setMessage(`${data.message}\nSent to: ${data.details?.to}\nSMTP: ${data.details?.smtpHost}:${data.details?.smtpPort}`)
+        setMessage(`${data.message}\nSent to: ${data.data?.to}`)
       } else {
         setMessageType('error')
         setMessage(data.message || 'Failed to send email')
