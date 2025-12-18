@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="doc/ARCHITECTURE_GUIDE.md" />
+    <File Path="doc/QUICKSTART.md" />
     <File Path="README.md" />
   </Folder>
   <Project Path="netchapteraspire.client/netchapteraspire.client.esproj">

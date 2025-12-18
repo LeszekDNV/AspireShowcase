@@ -305,25 +305,187 @@ Click on the **Dashboard** link to see all running services and their logs.
 
 ## 🏗️ Architecture
 
-This application follows **Clean Architecture** principles with clear separation of concerns:
+This application follows **Clean Architecture** principles with clear separation of concerns.
 
+### High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser[🌐 Browser]
+        ReactApp[⚛️ React + TypeScript<br/>Vite Dev Server]
+    end
+    
+    subgraph "API Layer - .NET 10"
+        Controllers[🎮 Controllers<br/>HTTP Endpoints]
+        Middleware[🛡️ Global Exception Handler]
+    end
+    
+    subgraph "Business Layer"
+        Services[⚙️ Services<br/>Business Logic]
+        Interfaces[🔌 Interfaces<br/>Abstractions]
+    end
+    
+    subgraph "Data Layer"
+        EFCore[💾 EF Core<br/>DbContext]
+        Entities[📦 Entities<br/>Domain Models]
+    end
+    
+    subgraph "Infrastructure - Azure & External Services"
+        AzureBlob[☁️ Azure Blob Storage<br/>Azurite Emulator]
+        AzureServiceBus[📨 Azure Service Bus<br/>Local Emulator]
+        SQLServer[🗄️ SQL Server<br/>Container]
+        MailPit[📧 MailPit<br/>SMTP Server]
+    end
+    
+    subgraph "Orchestration - .NET Aspire"
+        AspireHost[🎯 Aspire AppHost<br/>Orchestration]
+        Dashboard[📊 Aspire Dashboard<br/>Monitoring]
+    end
+    
+    Browser --> ReactApp
+    ReactApp -->|HTTPS| Controllers
+    Controllers --> Middleware
+    Middleware --> Controllers
+    Controllers --> Interfaces
+    Interfaces --> Services
+    Services --> EFCore
+    Services --> AzureBlob
+    Services --> AzureServiceBus
+    Services --> MailPit
+    EFCore --> Entities
+    EFCore --> SQLServer
+    
+    AspireHost -.->|Orchestrates| ReactApp
+    AspireHost -.->|Orchestrates| Controllers
+    AspireHost -.->|Manages| AzureBlob
+    AspireHost -.->|Manages| AzureServiceBus
+    AspireHost -.->|Manages| SQLServer
+    AspireHost -.->|Manages| MailPit
+    Dashboard -.->|Monitors| AspireHost
+    
+    style Browser fill:#e1f5ff
+    style ReactApp fill:#61dafb
+    style Controllers fill:#512bd4
+    style Middleware fill:#ff6b6b
+    style Services fill:#ffd93d
+    style Interfaces fill:#a8dadc
+    style EFCore fill:#6bcf7f
+    style Entities fill:#95e1d3
+    style AzureBlob fill:#0078d4
+    style AzureServiceBus fill:#0078d4
+    style SQLServer fill:#cc2927
+    style MailPit fill:#ff6b35
+    style AspireHost fill:#512bd4
+    style Dashboard fill:#457b9d
 ```
-┌─────────────────────────────────────────┐
-│          Controllers Layer              │
-│  (HTTP, Routing, Validation)            │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│         Services Layer                  │
-│  (Business Logic, Orchestration)        │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│      Infrastructure Layer               │
-│  (Azure SDK, EF Core, External APIs)    │
-└─────────────────────────────────────────┘
+
+### Layered Architecture Details
+
+```mermaid
+flowchart LR
+    subgraph Presentation["🎨 Presentation Layer"]
+        direction TB
+        UI[React UI Components]
+        Router[React Router]
+        State[State Management]
+    end
+    
+    subgraph API["🎮 API Layer"]
+        direction TB
+        CTRL[Controllers]
+        VAL[Validation]
+        RESP[ApiResponse Wrapper]
+    end
+    
+    subgraph Business["⚙️ Business Layer"]
+        direction TB
+        SVC[Services]
+        INT[Interfaces]
+        DTO[DTOs]
+    end
+    
+    subgraph Data["💾 Data Layer"]
+        direction TB
+        CTX[DbContext]
+        ENT[Entities]
+        MIG[Migrations]
+    end
+    
+    subgraph External["☁️ External Services"]
+        direction TB
+        AZURE[Azure SDK]
+        SMTP[SMTP Client]
+    end
+    
+    Presentation -->|HTTP/HTTPS| API
+    API -->|Dependency Injection| Business
+    Business -->|Data Access| Data
+    Business -->|Cloud Calls| External
+    
+    style Presentation fill:#e1f5ff
+    style API fill:#fff3e0
+    style Business fill:#f3e5f5
+    style Data fill:#c8e6c9
+    style External fill:#ffebee
+```
+
+### Request Flow Example
+
+```mermaid
+sequenceDiagram
+    actor User as 👤 User
+    participant UI as ⚛️ React App
+    participant API as 🎮 Controller
+    participant SVC as ⚙️ Service
+    participant DB as 💾 Database
+    participant Azure as ☁️ Azure
+    
+    User->>UI: Upload file
+    UI->>API: POST /api/BlobStorage/upload
+    Note over API: Validate request
+    API->>SVC: UploadFileAsync()
+    Note over SVC: Business logic
+    SVC->>Azure: Upload to Blob Storage
+    Azure-->>SVC: Upload successful
+    SVC->>DB: Log operation
+    DB-->>SVC: Success
+    SVC-->>API: Return file name
+    Note over API: Wrap in ApiResponse
+    API-->>UI: 200 OK { success, data }
+    UI-->>User: Show success message
+```
+
+### Technology Stack
+
+```mermaid
+mindmap
+  root((AspireShowcase))
+    Frontend
+      React 19
+      TypeScript
+      Vite
+      React Router
+    Backend
+      .NET 10
+      ASP.NET Core
+      Entity Framework Core
+      C# 14
+    Cloud Services
+      Azure Blob Storage
+      Azure Service Bus
+      SQL Server
+      MailPit SMTP
+    DevOps
+      .NET Aspire 13.1
+      Podman Containers
+      Docker Compose
+      Hot Reload
+    Architecture
+      Clean Architecture
+      SOLID Principles
+      DI Container
+      Repository Pattern
 ```
 
 ### Key Patterns
@@ -333,16 +495,29 @@ This application follows **Clean Architecture** principles with clear separation
 - 💉 **Dependency Injection** - Loose coupling
 - 🎭 **Service Layer** - Business logic encapsulation
 - 🛡️ **Global Error Handling** - Centralized exception management
+- 📦 **API Response Wrapper** - Consistent response structure
+
+### Components Overview
+
+| Layer | Components | Responsibility |
+|-------|-----------|----------------|
+| **Frontend** | React Components, Pages, Hooks | User interface and interaction |
+| **API** | Controllers, Middleware | HTTP request handling, routing |
+| **Business** | Services, Interfaces | Business logic, orchestration |
+| **Data** | DbContext, Repositories | Data access, persistence |
+| **Infrastructure** | Azure SDK, SMTP | External service integration |
 
 ### For detailed architecture documentation, see:
 📖 **[ARCHITECTURE_GUIDE.md](doc/ARCHITECTURE_GUIDE.md)**
 
-This guide includes:
-- Detailed layer responsibilities
-- How to add new endpoints
-- Dependency injection best practices
-- Testing strategies
-- Code migration patterns
+This comprehensive guide includes:
+- 🏗️ **Detailed layer responsibilities** with code examples
+- 📝 **How to add new endpoints** step-by-step
+- 💉 **Dependency injection best practices** and lifecycle management
+- 🧪 **Testing strategies** for unit and integration tests
+- 🔄 **Code migration patterns** from old to new architecture
+- 📊 **Visual diagrams** with Mermaid for all major flows
+- 🎯 **SOLID principles** application examples
 
 ---
 
